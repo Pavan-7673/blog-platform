@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevBlog — Tech Articles</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    .header { background: #1a1a2e; color: #fff; padding: 20px 0; text-align: center; }
+    .header h1 { font-size: 28px; }
+    .header p { font-size: 14px; color: #aaa; margin-top: 6px; }
+    .container { max-width: 800px; margin: 30px auto; padding: 0 20px; }
+    .create-form { background: #fff; padding: 24px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .create-form h2 { font-size: 18px; margin-bottom: 16px; color: #1a1a2e; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #555; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: Arial; }
+    .form-group textarea { height: 100px; resize: vertical; }
+    .btn { padding: 10px 24px; background: #1a5ea8; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
+    .btn:hover { background: #154d8f; }
+    .posts-section h2 { font-size: 20px; margin-bottom: 16px; color: #1a1a2e; }
+    .post-card { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .post-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .post-title { font-size: 18px; font-weight: bold; color: #1a1a2e; }
+    .delete-btn { background: none; border: none; color: #e05c2a; cursor: pointer; font-size: 18px; }
+    .post-meta { font-size: 12px; color: #999; margin-bottom: 12px; }
+    .post-content { font-size: 14px; color: #555; line-height: 1.7; }
+    .empty-state { text-align: center; padding: 40px; color: #999; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; }
+    .loading { text-align: center; padding: 20px; color: #999; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>✍️ DevBlog</h1>
+  <p>Share your tech knowledge with the world</p>
+</div>
+
+<div class="container">
+  <div class="create-form">
+    <h2>📝 Write a New Post</h2>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="title" placeholder="e.g. How to deploy on Kubernetes">
+    </div>
+    <div class="form-group">
+      <label>Author</label>
+      <input type="text" id="author" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label>Content</label>
+      <textarea id="content" placeholder="Write your article here..."></textarea>
+    </div>
+    <button class="btn" onclick="createPost()">Publish Post</button>
+  </div>
+
+  <div class="posts-section">
+    <h2>📚 Latest Posts</h2>
+    <div id="posts-container">
+      <div class="loading">Loading posts...</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_URL = '/api';
+
+  async function loadPosts() {
+    try {
+      const res = await fetch(`${API_URL}/posts`);
+      const posts = await res.json();
+      const container = document.getElementById('posts-container');
+      if (posts.length === 0) {
+        container.innerHTML = '<div class="empty-state">No posts yet. Be the first to write one!</div>';
+        return;
+      }
+      container.innerHTML = posts.map(post => `
+        <div class="post-card" id="post-${post.id}">
+          <div class="post-header">
+            <div class="post-title">${post.title}</div>
+            <button class="delete-btn" onclick="deletePost(${post.id})">🗑</button>
+          </div>
+          <div class="post-meta">✍️ ${post.author} &nbsp;|&nbsp; 🕐 ${new Date(post.created_at).toLocaleDateString()}</div>
+          <div class="post-content">${post.content}</div>
+        </div>
+      `).join('');
+    } catch (err) {
+      document.getElementById('posts-container').innerHTML = '<div class="empty-state">Could not connect to backend. Make sure the API is running.</div>';
+    }
+  }
+
+  async function createPost() {
+    const title = document.getElementById('title').value.trim();
+    const author = document.getElementById('author').value.trim();
+    const content = document.getElementById('content').value.trim();
+
+    if (!title || !author || !content) {
+      showToast('Please fill in all fields!');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, author, content })
+      });
+      if (res.ok) {
+        document.getElementById('title').value = '';
+        document.getElementById('author').value = '';
+        document.getElementById('content').value = '';
+        showToast('Post published successfully!');
+        loadPosts();
+      }
+    } catch (err) {
+      showToast('Error creating post!');
+    }
+  }
+
+  async function deletePost(id) {
+    try {
+      await fetch(`${API_URL}/posts/${id}`, { method: 'DELETE' });
+      document.getElementById(`post-${id}`).remove();
+      showToast('Post deleted!');
+    } catch (err) {
+      showToast('Error deleting post!');
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+  }
+
+  loadPosts();
+</script>
+</body>
+</html>
